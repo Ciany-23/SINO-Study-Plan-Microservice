@@ -1,16 +1,17 @@
 package com.studyplan.studyPlanMicroservice.controller;
 
 import com.studyplan.studyPlanMicroservice.data.ApiResponse;
+import com.studyplan.studyPlanMicroservice.data.PageResponse;
 import com.studyplan.studyPlanMicroservice.data.UniversityData;
 import com.studyplan.studyPlanMicroservice.service.UniversityService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/universities")
@@ -38,17 +39,28 @@ public class UniversityController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all universities")
-    public ResponseEntity<ApiResponse<List<UniversityData>>> getAllUniversities() {
-        List<UniversityData> universities = universityService.getAllUniversities();
-        return ResponseEntity.ok(ApiResponse.success(universities, "Universities retrieved"));
-    }
+    @Operation(summary = "Get all universities with pagination and optional filters")
+    public ResponseEntity<ApiResponse<PageResponse<UniversityData>>> getAllUniversities(
+            @Parameter(description = "University name (optional filter)")
+            @RequestParam(required = false) String name,
+            @Parameter(description = "Country (optional filter)")
+            @RequestParam(required = false) String country,
+            @Parameter(description = "Status (optional filter)")
+            @RequestParam(required = false) Boolean status,
+            @Parameter(description = "Page number (0-indexed)")
+            @RequestParam(defaultValue = "0") Integer page,
+            @Parameter(description = "Page size")
+            @RequestParam(defaultValue = "10") Integer size) {
 
-    @GetMapping("/active")
-    @Operation(summary = "Get active universities")
-    public ResponseEntity<ApiResponse<List<UniversityData>>> getActiveUniversities() {
-        List<UniversityData> universities = universityService.getActiveUniversities();
-        return ResponseEntity.ok(ApiResponse.success(universities, "Active universities retrieved"));
+        PageResponse<UniversityData> result;
+
+        if (name != null || country != null || status != null) {
+            result = universityService.searchUniversities(name, country, status, page, size);
+        } else {
+            result = universityService.getAllUniversities(page, size);
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(result, "Universities retrieved successfully"));
     }
 
     @PutMapping("/{id}")
@@ -66,4 +78,3 @@ public class UniversityController {
         return ResponseEntity.ok(ApiResponse.success(null, "University deleted"));
     }
 }
-
