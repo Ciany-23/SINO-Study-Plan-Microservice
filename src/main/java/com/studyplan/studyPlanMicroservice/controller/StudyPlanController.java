@@ -1,9 +1,11 @@
 package com.studyplan.studyPlanMicroservice.controller;
 
 import com.studyplan.studyPlanMicroservice.data.ApiResponse;
+import com.studyplan.studyPlanMicroservice.data.PageResponse;
 import com.studyplan.studyPlanMicroservice.data.StudyPlanData;
 import com.studyplan.studyPlanMicroservice.service.StudyPlanService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,10 +41,30 @@ public class StudyPlanController {
     }
 
     @GetMapping
-    @Operation(summary = "Get all study plans")
-    public ResponseEntity<ApiResponse<List<StudyPlanData>>> getAllStudyPlans() {
-        List<StudyPlanData> plans = studyPlanService.getAllStudyPlans();
-        return ResponseEntity.ok(ApiResponse.success(plans, "Study plans retrieved"));
+    @Operation(summary = "Get all study plans with pagination and optional filters")
+    public ResponseEntity<ApiResponse<PageResponse<StudyPlanData>>> getAllStudyPlans(
+            @Parameter(description = "Study plan name (optional filter)")
+            @RequestParam(required = false) String name,
+            @Parameter(description = "Career name (optional filter)")
+            @RequestParam(required = false) String career,
+            @Parameter(description = "University ID (optional filter)")
+            @RequestParam(required = false) Integer universityId,
+            @Parameter(description = "Status (optional filter)")
+            @RequestParam(required = false) Boolean status,
+            @Parameter(description = "Page number (0-indexed)")
+            @RequestParam(defaultValue = "0") Integer page,
+            @Parameter(description = "Page size")
+            @RequestParam(defaultValue = "10") Integer size) {
+
+        PageResponse<StudyPlanData> result;
+
+        if (name != null || career != null || universityId != null || status != null) {
+            result = studyPlanService.searchStudyPlans(name, career, universityId, status, page, size);
+        } else {
+            result = studyPlanService.getAllStudyPlans(page, size);
+        }
+
+        return ResponseEntity.ok(ApiResponse.success(result, "Study plans retrieved successfully"));
     }
 
     @GetMapping("/university/{universityId}")
