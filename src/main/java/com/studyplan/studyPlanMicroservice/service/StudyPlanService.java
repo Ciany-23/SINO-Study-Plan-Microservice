@@ -1,13 +1,21 @@
 package com.studyplan.studyPlanMicroservice.service;
 
+import com.studyplan.studyPlanMicroservice.data.PageResponse;
 import com.studyplan.studyPlanMicroservice.data.StudyPlanData;
 import com.studyplan.studyPlanMicroservice.domain.StudyPlan;
 import com.studyplan.studyPlanMicroservice.jpa.StudyPlanRepository;
-import com.studyplan.studyPlanMicroservice.jpa.UniversityRepository;
+
+import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -16,19 +24,11 @@ import java.util.stream.Collectors;
 public class StudyPlanService {
 
     private final StudyPlanRepository studyPlanRepository;
-    private final UniversityRepository universityRepository;
 
     @Transactional
     public StudyPlanData createStudyPlan(StudyPlanData data) {
-        // verify university exists
-        if (!universityRepository.existsById(data.getIdUniversity())) {
-            throw new RuntimeException("University not found: " + data.getIdUniversity());
-        }
-
-        // Check for duplicates
-        if (studyPlanRepository.existsByDscCareerAndIdUniversity(
-                data.getDscCareer(), data.getIdUniversity())) {
-            throw new RuntimeException("Study plan already exists for this career");
+        if (studyPlanRepository.existsByDscCareerAndIdUniversity(data.getDscCareer(), data.getIdUniversity())) {
+            throw new RuntimeException("Study plan already exists for this career and university");
         }
 
         StudyPlan studyPlan = StudyPlan.builder()
@@ -52,15 +52,42 @@ public class StudyPlanService {
     }
 
     @Transactional(readOnly = true)
-    public List<StudyPlanData> getAllStudyPlans() {
-        return studyPlanRepository.findAll().stream()
-                .map(this::toData)
-                .collect(Collectors.toList());
+    public PageResponse<StudyPlanData> getAllStudyPlans(Integer page, Integer size) {
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.ASC, "dscName")
+        );
+
+        Page<StudyPlan> studyPlanPage = studyPlanRepository.findAll(pageable);
+
+        return PageResponse.from(studyPlanPage, this::toData);
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<StudyPlanData> searchStudyPlans(
+            String name,
+            String career,
+            Integer universityId,
+            Boolean status,
+            Integer page,
+            Integer size) {
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(Sort.Direction.ASC, "dscName")
+        );
+        Page<StudyPlan> studyPlanPage = studyPlanRepository.findAll(
+                buildSpecification(name, career, universityId, status),
+                pageable
+        );
+        return PageResponse.from(studyPlanPage, this::toData);
     }
 
     @Transactional(readOnly = true)
     public List<StudyPlanData> getStudyPlansByUniversity(Integer universityId) {
-        return studyPlanRepository.findByIdUniversity(universityId).stream()
+        return studyPlanRepository.findByIdUniversity(universityId)
+                .stream()
                 .map(this::toData)
                 .collect(Collectors.toList());
     }
@@ -70,6 +97,7 @@ public class StudyPlanService {
         StudyPlan studyPlan = studyPlanRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Study plan not found: " + id));
 
+        studyPlan.setIdUniversity(data.getIdUniversity());
         studyPlan.setDscName(data.getDscName());
         studyPlan.setDscCareer(data.getDscCareer());
         studyPlan.setTypePeriod(data.getTypePeriod());
@@ -86,6 +114,41 @@ public class StudyPlanService {
             throw new RuntimeException("Study plan not found: " + id);
         }
         studyPlanRepository.deleteById(id);
+    }
+
+    private Specification<StudyPlan> buildSpecification(String name, String career, Integer universityId, Boolean status) {
+        return (root, query, criteriaBuilder) -> {
+            List<Predicate> predicates = new ArrayList<>();
+
+            if (name != null && !name.trim().isEmpty()) {
+                predicates.add(
+                        criteriaBuilder.like(
+                                criteriaBuilder.lower(root.get("dscName")),
+                                "%" + name.toLowerCase() + "%"
+                        )
+                );
+            }
+            if (career != null && !career.trim().isEmpty()) {
+                predicates.add(
+                        criteriaBuilder.like(
+                                criteriaBuilder.lower(root.get("dscCareer")),
+                                "%" + career.toLowerCase() + "%"
+                        )
+                );
+            }
+            if (universityId != null) {
+                predicates.add(
+                        criteriaBuilder.equal(root.get("idUniversity"), universityId)
+                );
+            }
+            if (status != null) {
+                predicates.add(
+                        criteriaBuilder.equal(root.get("status"), status)
+                );
+            }
+
+            return criteriaBuilder.and(predicates.toArray(new Predicate[0]));
+        };
     }
 
     private StudyPlanData toData(StudyPlan studyPlan) {
