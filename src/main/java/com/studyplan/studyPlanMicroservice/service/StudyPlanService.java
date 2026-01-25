@@ -33,7 +33,7 @@ public class StudyPlanService {
 
         if (studyPlanRepository.existsByDscCareerAndIdUniversity(data.getDscCareer(), data.getIdUniversity())) {
             // If it exists globally, we might just want to link it if not already linked
-            StudyPlan existing = studyPlanRepository.findAll(buildSpecification(null, data.getDscCareer(), data.getIdUniversity(), null), PageRequest.of(0, 1)).getContent().stream().findFirst().orElse(null);
+            StudyPlan existing = studyPlanRepository.findAll(buildSpecification(null, data.getDscCareer(), data.getYearLevel(), data.getIdUniversity(), null), PageRequest.of(0, 1)).getContent().stream().findFirst().orElse(null);
             if (existing != null) {
                 if (studyPlanRepository.existsRelationship(user.getIdUser(), existing.getIdStudyPlan()) == 0) {
                     studyPlanRepository.linkUserToPlan(user.getIdUser(), existing.getIdStudyPlan());
@@ -94,6 +94,7 @@ public class StudyPlanService {
     public PageResponse<StudyPlanData> searchStudyPlans(
             String name,
             String career,
+            String yearLevel,
             Integer universityId,
             Boolean status,
             Integer page,
@@ -104,7 +105,7 @@ public class StudyPlanService {
                 Sort.by(Sort.Direction.ASC, "dscName")
         );
         Page<StudyPlan> studyPlanPage = studyPlanRepository.findAll(
-                buildSpecification(name, career, universityId, status),
+                buildSpecification(name, career, yearLevel, universityId, status),
                 pageable
         );
         return PageResponse.from(studyPlanPage, this::toData);
@@ -142,7 +143,7 @@ public class StudyPlanService {
         studyPlanRepository.deleteById(id);
     }
 
-    private Specification<StudyPlan> buildSpecification(String name, String career, Integer universityId, Boolean status) {
+    private Specification<StudyPlan> buildSpecification(String name, String career, String yearLevel, Integer universityId, Boolean status) {
         return (root, query, criteriaBuilder) -> {
             List<Predicate> predicates = new ArrayList<>();
 
@@ -162,6 +163,14 @@ public class StudyPlanService {
                         )
                 );
             }
+            if (yearLevel != null) {
+
+                predicates.add(
+                        criteriaBuilder.equal(root.get("yearLevel"), yearLevel)
+                );
+                // Asumiendo que el atributo en tu entidad StudyPlan se llama "yearLevel"
+            }
+
             if (universityId != null) {
                 predicates.add(
                         criteriaBuilder.equal(root.get("idUniversity"), universityId)

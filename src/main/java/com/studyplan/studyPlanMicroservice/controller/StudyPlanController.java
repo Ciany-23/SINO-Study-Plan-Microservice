@@ -60,6 +60,7 @@ public class StudyPlanController {
             @RequestParam(required = false) String name,
             @Parameter(description = "Career name (optional filter)")
             @RequestParam(required = false) String career,
+            @RequestParam(required = false) String yearLevel,
             @Parameter(description = "University ID (optional filter)")
             @RequestParam(required = false) Integer universityId,
             @Parameter(description = "Status (optional filter)")
@@ -71,8 +72,8 @@ public class StudyPlanController {
 
         PageResponse<StudyPlanData> result;
 
-        if (name != null || career != null || universityId != null || status != null) {
-            result = studyPlanService.searchStudyPlans(name, career, universityId, status, page, size);
+        if (name != null || career != null || yearLevel != null || universityId != null || status != null) {
+            result = studyPlanService.searchStudyPlans(name, career, yearLevel, universityId, status, page, size);
         } else {
             result = studyPlanService.getAllStudyPlans(page, size);
         }
