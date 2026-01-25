@@ -2,14 +2,17 @@ package com.studyplan.studyPlanMicroservice.service;
 
 import com.studyplan.studyPlanMicroservice.data.CourseData;
 import com.studyplan.studyPlanMicroservice.domain.Course;
+import com.studyplan.studyPlanMicroservice.domain.Requirement;
 import com.studyplan.studyPlanMicroservice.domain.StudyPlan;
 import com.studyplan.studyPlanMicroservice.jpa.CourseRepository;
+import com.studyplan.studyPlanMicroservice.jpa.RequirementRepository;
 import com.studyplan.studyPlanMicroservice.jpa.StudyPlanRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -18,6 +21,7 @@ public class CourseService {
 
     private final CourseRepository courseRepository;
     private final StudyPlanRepository studyPlanRepository;
+    private final RequirementRepository requirementRepository;
 
     @Transactional
     public CourseData createCourse(CourseData data) {
@@ -49,9 +53,51 @@ public class CourseService {
 
     //create a list of courses in a single transaction
     @Transactional
-    public List<CourseData> createCourseBatch(List<CourseData> courses) {
-        return courses.stream()
-                .map(this::createCourse)
+    public List<CourseData> createCourseBatch(List<CourseData> coursesData) {
+        // 1. Save all courses first
+        List<Course> savedCourses = coursesData.stream().map(data -> {
+            // Check existence logic skipped for batch to speed up, or could use upsert. 
+            // Assuming clean batch for now.
+             Course course = Course.builder()
+                .idStudyPlan(data.getIdStudyPlan())
+                .dscCode(data.getDscCode())
+                .dscName(data.getDscName())
+                .dscLevel(data.getDscLevel())
+                .dscPeriod(data.getDscPeriod())
+                .typeCourse(data.getTypeCourse())
+                .numCredits(data.getNumCredits())
+                .requirement(data.isRequirement())
+                .description(data.getDescription())
+                .build();
+             return courseRepository.save(course);
+        }).collect(Collectors.toList());
+
+        // 2. Map Code -> ID
+        Map<String, Integer> codeToId = savedCourses.stream()
+                .collect(Collectors.toMap(Course::getDscCode, Course::getIdCourse));
+
+        // 3. Save Requirements
+        for (CourseData data : coursesData) {
+            if (data.getPrerequisites() != null && !data.getPrerequisites().isEmpty()) {
+                Integer courseId = codeToId.get(data.getDscCode());
+                if (courseId == null) continue;
+
+                for (String reqCode : data.getPrerequisites()) {
+                    Integer reqId = codeToId.get(reqCode);
+                    if (reqId != null) {
+                        Requirement req = Requirement.builder()
+                                .idCourse(courseId)
+                                .idCourseRequirement(reqId)
+                                .typeRequirement("OBLIGATORY")
+                                .build();
+                        requirementRepository.save(req);
+                    }
+                }
+            }
+        }
+
+        return savedCourses.stream()
+                .map(this::toData)
                 .collect(Collectors.toList());
     }
 
