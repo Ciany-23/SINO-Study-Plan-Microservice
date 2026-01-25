@@ -23,4 +23,6 @@ public interface CourseRepository extends JpaRepository<Course, Integer> {
     List<Course> findByStudyPlanAndPeriod(Integer studyPlanId, String period);
 
     boolean existsByDscCode(String courseCode);
+
+    long countByIdStudyPlan(Integer idStudyPlan);
 }
