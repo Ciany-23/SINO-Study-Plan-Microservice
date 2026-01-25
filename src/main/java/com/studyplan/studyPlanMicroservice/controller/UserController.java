@@ -31,6 +31,13 @@ public class UserController {
                 .body(ApiResponse.success(created, "User created successfully"));
     }
 
+    @GetMapping("/check-username/{username}")
+    @Operation(summary = "Check if username exists")
+    public ResponseEntity<ApiResponse<Boolean>> checkUsername(@PathVariable String username) {
+        boolean exists = userService.existsByUsername(username);
+        return ResponseEntity.ok(ApiResponse.success(exists, exists ? "Username taken" : "Username available"));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "Get user by ID")
     public ResponseEntity<ApiResponse<UserData>> getUserById(@PathVariable Integer id) {
@@ -42,6 +49,13 @@ public class UserController {
     @Operation(summary = "Get user by email")
     public ResponseEntity<ApiResponse<UserData>> getUserByEmail(@PathVariable String email) {
         UserData user = userService.getUserByEmail(email);
+        return ResponseEntity.ok(ApiResponse.success(user, "User retrieved"));
+    }
+
+    @GetMapping("/firebase/{uid}")
+    @Operation(summary = "Get user by Firebase UID")
+    public ResponseEntity<ApiResponse<UserData>> getUserByFirebaseUid(@PathVariable String uid) {
+        UserData user = userService.getUserByFirebaseUid(uid);
         return ResponseEntity.ok(ApiResponse.success(user, "User retrieved"));
     }
 

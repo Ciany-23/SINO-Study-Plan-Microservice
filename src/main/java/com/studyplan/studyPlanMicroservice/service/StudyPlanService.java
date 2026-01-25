@@ -24,11 +24,22 @@ import java.util.stream.Collectors;
 public class StudyPlanService {
 
     private final StudyPlanRepository studyPlanRepository;
+    private final UserService userService;
 
     @Transactional
-    public StudyPlanData createStudyPlan(StudyPlanData data) {
+    public StudyPlanData createStudyPlan(StudyPlanData data, String userEmail) {
+        // Find or create user
+        var user = userService.getOrCreateUserByEmail(userEmail);
+
         if (studyPlanRepository.existsByDscCareerAndIdUniversity(data.getDscCareer(), data.getIdUniversity())) {
-            throw new RuntimeException("Study plan already exists for this career and university");
+            // If it exists globally, we might just want to link it if not already linked
+            StudyPlan existing = studyPlanRepository.findAll(buildSpecification(null, data.getDscCareer(), data.getIdUniversity(), null), PageRequest.of(0, 1)).getContent().stream().findFirst().orElse(null);
+            if (existing != null) {
+                if (studyPlanRepository.existsRelationship(user.getIdUser(), existing.getIdStudyPlan()) == 0) {
+                    studyPlanRepository.linkUserToPlan(user.getIdUser(), existing.getIdStudyPlan());
+                }
+                return toData(existing);
+            }
         }
 
         StudyPlan studyPlan = StudyPlan.builder()
@@ -41,7 +52,22 @@ public class StudyPlanService {
                 .build();
 
         StudyPlan saved = studyPlanRepository.save(studyPlan);
+        
+        // Link to user
+        studyPlanRepository.linkUserToPlan(user.getIdUser(), saved.getIdStudyPlan());
+        
         return toData(saved);
+    }
+
+    @Transactional
+    public List<StudyPlanData> getStudyPlansByUser(String email) {
+        // Asegurar que el usuario existe en MySQL al consultar
+        userService.getOrCreateUserByEmail(email);
+        
+        return studyPlanRepository.findByUserEmail(email)
+                .stream()
+                .map(this::toData)
+                .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)

@@ -27,10 +27,23 @@ public class StudyPlanController {
     @PostMapping
     @Operation(summary = "Create a new study plan")
     public ResponseEntity<ApiResponse<StudyPlanData>> createStudyPlan(
-            @Valid @RequestBody StudyPlanData data) {
-        StudyPlanData created = studyPlanService.createStudyPlan(data);
+            @Valid @RequestBody StudyPlanData data,
+            @RequestHeader(value = "X-User-Email", required = false) String userEmail) {
+        if (userEmail == null || userEmail.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("X-User-Email header is required"));
+        }
+        StudyPlanData created = studyPlanService.createStudyPlan(data, userEmail);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(created, "Study plan created successfully"));
+    }
+
+    @GetMapping("/my")
+    @Operation(summary = "Get study plans for the authenticated user")
+    public ResponseEntity<ApiResponse<List<StudyPlanData>>> getMyStudyPlans(
+            @RequestHeader(value = "X-User-Email") String userEmail) {
+        List<StudyPlanData> plans = studyPlanService.getStudyPlansByUser(userEmail);
+        return ResponseEntity.ok(ApiResponse.success(plans, "User study plans retrieved"));
     }
 
     @GetMapping("/{id}")
