@@ -44,4 +44,6 @@ public class CourseData {
     private boolean requirement;
 
     private String description;
+
+    private java.util.List<String> prerequisites;
 }
